@@ -4,6 +4,7 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 import pickle
 import time
 import os
@@ -72,32 +73,34 @@ else:
     cookies = browser.get_cookies()
     pickle.dump(cookies, open('cookies.pkl', 'wb'))
 
+# Mass shipping
 WebDriverWait(browser, 10).until(
         EC.presence_of_element_located(
             (By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[2]/ul/li[1]/ul/li[2]/a')))
 
 browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[1]/div/div[2]/ul/li[1]/ul/li[2]/a').click()
 
+# Orders to ship
 WebDriverWait(browser, 10).until(
         EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[1]/div/div[1]/div[2]/div/i')))
+            (By.XPATH, '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[1]/div/div[1]/div[1]/div/i')))
 
-browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[1]/div/div[1]/div[2]/div/i').click()
+browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[1]/div/div[1]/div[1]/div/i').click()
 
 time.sleep(5)
 
 WebDriverWait(browser, 10).until(
         EC.presence_of_element_located(
-            (By.XPATH, '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[2]/div/div[1]/label[1]')))
+            (By.XPATH, '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]')))
 
-browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[2]/div/div[1]/label[1]').click()
+browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]').click()
 
 WebDriverWait(browser, 10).until(
         EC.presence_of_element_located(
             (By.CLASS_NAME, 'mass-ship-list-item')))
 
 orders = browser.find_elements_by_class_name("mass-ship-list-item")
-orders = orders[1:5]
+orders = orders[1:]
 number_of_orders = len(orders)
 
 order_ids = []
@@ -143,8 +146,37 @@ for order in orders:
         # Print waybill page
         order.find_element_by_class_name("shopee-checkbox__indicator").click()
         time.sleep(3)
+
+        # Mass pickup button
         browser.find_element_by_xpath(
-            '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/button').click()
+            '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/button').click()
+
+        # Confirm Button
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/div[4]/button[2]')))
+
+        browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/div[4]/button[2]').click()
+
+        # Generate button
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH,
+                 '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[3]/div[2]/div/button')))
+
+        generate_button_ele = browser.find_element_by_xpath(
+            '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[3]/div[2]/div/button')
+
+        action = ActionChains(browser)
+        action.move_to_element(generate_button_ele).perform()
+
+        time.sleep(2)
+
+        generate_waybill_button = browser.find_element_by_xpath('/html/body/div[5]/ul/li[2]/div[2]/div')
+
+        action.move_to_element(generate_waybill_button).perform()
+        generate_waybill_button.click()
+
         time.sleep(3)
         browser.switch_to.window(browser.window_handles[1])
         time.sleep(10)
@@ -159,7 +191,7 @@ for order in orders:
         browser.close()
         browser.switch_to.window(browser.window_handles[0])
         time.sleep(3)
-        order.find_element_by_class_name("shopee-checkbox__indicator").click()
+        browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[1]/div[2]/i').click()
 
     else:
         print("already have order id: ", order_id)
