@@ -1,6 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -83,10 +82,13 @@ browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[1]/div/div[2]/ul/li[1]/
 
 def get_orders_generate_pdf(jt=0):
     time.sleep(3)
+    flag = 0
     orders = browser.find_elements_by_class_name("mass-ship-list-item")
     orders = orders[1:3]
 
     number_of_orders = len(orders)
+    if number_of_orders == 0:
+        return 0
 
     order_ids = []
     already_have = [dir.split('.')[0] for dir in os.listdir(os.getcwd() + '\\waybill_pdf')]
@@ -99,7 +101,10 @@ def get_orders_generate_pdf(jt=0):
         
         orders = browser.find_elements_by_class_name("mass-ship-list-item")
         orders = orders[1:]
-        order = orders[0]
+        if flag:
+            order = orders[1]
+        else:
+            order = orders[0]
         number_of_orders -= 1
         order_id_ele = order.find_element_by_class_name('orderid')
         order_id = order_id_ele.text
@@ -135,6 +140,11 @@ def get_orders_generate_pdf(jt=0):
 
             # Print waybill page
             order.find_element_by_class_name("shopee-checkbox__indicator").click()
+            if not order.find_element_by_class_name("shopee-checkbox__indicator").is_selected():
+                print("Details saved but cannot generate pdf(Cannot select checkbox) for order id {}.".format(order_id))
+                browser.refresh()
+                flag=1
+                continue
             time.sleep(3)
 
             # Mass pickup button
@@ -184,6 +194,8 @@ def get_orders_generate_pdf(jt=0):
             generate_waybill_button.click()
 
             time.sleep(3)
+
+            # Saving PDF
             browser.switch_to.window(browser.window_handles[1])
             time.sleep(10)
             pyautogui.rightClick(x=windows_size['width'] // 2, y=windows_size['height'] // 2)
@@ -231,11 +243,14 @@ WebDriverWait(browser, 10).until(
         EC.presence_of_element_located(
             (By.CLASS_NAME, 'mass-ship-list-item')))
 
-order_ids = get_orders_generate_pdf()
-
-with open('standard_order.json', 'w') as outfile:
-    json.dump(order_ids, outfile)
-print(order_ids)
+order_details = get_orders_generate_pdf()
+if order_details == 0:
+    print("No orders in Standard delivery.")
+#
+else:
+    with open('standard_order.json', 'w') as outfile:
+        json.dump(order_details, outfile)
+print(order_details)
 
 browser.refresh()
 time.sleep(3)
@@ -251,11 +266,13 @@ WebDriverWait(browser, 10).until(
     EC.presence_of_element_located(
         (By.CLASS_NAME, 'mass-ship-list-item')))
 
-order_ids = get_orders_generate_pdf(jt=1)
-
-with open('j&tExpress_order.json', 'w') as outfile:
-    json.dump(order_ids, outfile)
-print(order_ids)
+order_details = get_orders_generate_pdf(jt=1)
+if order_details == 0:
+    print("No orders in J&T Express delivery.")
+else:
+    with open('j&tExpress_order.json', 'w') as outfile:
+        json.dump(order_details, outfile)
+print(order_details)
 
 
 time.sleep(10)
