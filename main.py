@@ -8,24 +8,31 @@ import pickle
 import time
 import os
 import json
-import pyperclip,pyautogui
+import pyperclip, pyautogui
+import glob
 
 
 class ShopeeAutomation:
     def __init__(self):
-        self.url = ""
         self.browser = ""
         self.orderDetails = ""
         self.cookies = ""
         self.windows_size = 0
 
+        paths = ""
+        with open("config\\config.json", "r") as file:
+            paths = json.loads(file.read())[0]
+        self.username = paths.get("username")
+        self.passw = paths.get("password")
+        self.homeDirectory = paths.get("homeDirectory")
+        self.jsonFolder = paths.get("jsonFolder")
+        self.pdfFolder = paths.get("pdfFolder")
+        self.url = paths.get("url")
+
     def login(self):
         WebDriverWait(self.browser, 10).until(
             EC.presence_of_element_located(
                 (By.XPATH, '//*[@id="app"]/div[2]/div/div/div/div[3]/div/div/div/div[2]/button')))
-
-        username = "gardenlabphilippines:staff1"
-        passw = "IOU123shopee"
 
         self.browser.find_element_by_xpath(
             '//*[@id="app"]/div[2]/div/div/div/div[3]/div/div/div/div[2]/button').click()
@@ -36,13 +43,13 @@ class ShopeeAutomation:
 
         self.browser.find_element_by_xpath(
             '/html/body/div/main/div/div[1]/div/div/div/div/div/div/div[2]/div[1]/div/div/div/input').send_keys(
-            username)
+            self.username)
         self.browser.find_element_by_xpath(
-            '/html/body/div/main/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/input').send_keys(passw)
+            '/html/body/div/main/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/input').send_keys(self.passw)
         self.browser.find_element_by_xpath('/html/body/div/main/div/div[1]/div/div/div/div/div/div/button[2]').click()
 
-        self.browser.find_element_by_xpath(
-            '//*[@id="shop-login"]/div[3]/label/span[1]').click()
+        # self.browser.find_element_by_xpath(
+        #    '//*[@id="shop-login"]/div[3]/label/span[1]').click()
 
         WebDriverWait(self.browser, 10).until(
             EC.presence_of_element_located(
@@ -60,18 +67,16 @@ class ShopeeAutomation:
 
     def setup(self):
         """Take all the inputs needed."""
-        #self.read_inputs()
-        self.url = "https://seller.shopee.ph/account/signin?next=%2F"
         chrome_options = Options()
         settings = {
-               "recentDestinations": [{
-                    "id": "Save as PDF",
-                    "origin": "local",
-                    "account": "",
-                }],
-                "selectedDestinationId": "Save as PDF",
-                "version": 2
-            }
+            "recentDestinations": [{
+                "id": "Save as PDF",
+                "origin": "local",
+                "account": "",
+            }],
+            "selectedDestinationId": "Save as PDF",
+            "version": 2
+        }
         prefs = {'printing.print_preview_sticky_settings.appState': json.dumps(settings)}
         chrome_options.add_experimental_option('prefs', prefs)
         chrome_options.add_argument('--kiosk-printing')
@@ -87,11 +92,11 @@ class ShopeeAutomation:
             for cookie in self.cookies:
                 self.browser.add_cookie(cookie)
             self.browser.refresh()
-
+            time.sleep(5)
             if self.browser.current_url == self.url:
                 self.login()
-            elif 1==2:
-                pass
+                print(self.browser.current_url)
+                print(self.url)
 
         else:
             self.login()
@@ -100,10 +105,10 @@ class ShopeeAutomation:
         """Main code to run the program"""
         # Mass shipping
         WebDriverWait(self.browser, 10).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, '//*[@id="app"]/div[2]/div[1]/div/div[2]/ul/li[1]/ul/li[2]/a')))
+            EC.element_to_be_clickable(
+                (By.LINK_TEXT, 'Mass Ship')))
 
-        self.browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[1]/div/div[2]/ul/li[1]/ul/li[2]/a').click()
+        self.browser.find_element_by_link_text('Mass Shipsadwq').click()
 
         # Orders to ship
         WebDriverWait(self.browser, 10).until(
@@ -125,18 +130,21 @@ class ShopeeAutomation:
 
         time.sleep(10)
 
-    def get_orders_generate_pdf(self, jt=0):
+    def get_orders_generate_pdf(self):
         time.sleep(3)
         flag = 0
         orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
-        orders = orders[1:3]
+        if len(orders)>3:
+            orders = orders[1:3]
+        else:
+            orders = orders[1:]
 
         number_of_orders = len(orders)
         if number_of_orders == 0:
             return 0
 
         order_ids = []
-        already_have = [dir.split('.')[0] for dir in os.listdir(os.getcwd() + '\\waybill_pdf')]
+
         self.orderDetails = []
         order_config = {"OrderId": None, "TrackingId": None, "Products": None}
         product_details = {"Name": None, "Quantity": None, "Variation": None, "UnitPrice": None, "SubTotal": None}
@@ -151,109 +159,98 @@ class ShopeeAutomation:
             else:
                 order = orders[0]
             number_of_orders -= 1
+            order.find_element_by_class_name("shopee-checkbox__indicator").click()
+
             order_id_ele = order.find_element_by_class_name('orderid')
             order_id = order_id_ele.text
-            if order_id not in already_have:
-                order_ids.append(order_id)
-                order_config["OrderId"] = order_id
-                order_config["Products"] = list()
 
-                order_id_ele.find_element_by_tag_name('a').click()
-                time.sleep(3)
-                # Order details page
-                self.browser.switch_to.window(self.browser.window_handles[1])
-                WebDriverWait(self.browser, 10).until(
-                    EC.presence_of_element_located(
-                        (By.CLASS_NAME, 'product-list-item')))
+            if not order.find_element_by_class_name("shopee-checkbox__input").is_selected():
 
-                products = self.browser.find_elements_by_class_name('product-list-item')[1:]
-                for product in products:
-                    product_details['Name'] = product.find_element_by_class_name("product-name").text
-                    product_details['Variation'] = product.find_element_by_class_name('product-meta').text
-                    product_details['Quantity'] = product.find_element_by_class_name('qty').text
-                    product_details['UnitPrice'] = product.find_element_by_class_name('price').text
-                    product_details['SubTotal'] = product.find_element_by_class_name('subtotal').text
+                print("Cannot generate PDF for order id {}. Skipping it".format(order_id))
+                number_of_orders=0
+                continue
 
-                    order_config['Products'].append(product_details.copy())
-                    for key in product_details.keys():
-                        product_details[key] = None
+            order_ids.append(order_id)
+            order_config["OrderId"] = order_id
+            order_config["Products"] = list()
 
-                self.orderDetails.append(order_config.copy())
+            order_id_ele.find_element_by_tag_name('a').click()
+            time.sleep(3)
+            # Order details page
+            self.browser.switch_to.window(self.browser.window_handles[1])
+            WebDriverWait(self.browser, 10).until(
+                EC.presence_of_element_located(
+                    (By.CLASS_NAME, 'product-list-item')))
 
-                self.browser.close()
-                self.browser.switch_to.window(self.browser.window_handles[0])
+            products = self.browser.find_elements_by_class_name('product-list-item')[1:]
+            for product in products:
+                product_details['Name'] = product.find_element_by_class_name("product-name").text
+                product_details['Variation'] = product.find_element_by_class_name('product-meta').text
+                product_details['Quantity'] = product.find_element_by_class_name('qty').text
+                product_details['UnitPrice'] = product.find_element_by_class_name('price').text
+                product_details['SubTotal'] = product.find_element_by_class_name('subtotal').text
 
-                # Print waybill page
-                order.find_element_by_class_name("shopee-checkbox__indicator").click()
-                time.sleep(2)
-                if not order.find_element_by_class_name("shopee-checkbox__indicator").is_selected():
-                    print("Details saved but cannot generate pdf(Cannot select checkbox) for order id {}.".format(order_id))
-                    self.browser.refresh()
-                    flag = 1
-                    continue
-                time.sleep(3)
+                order_config['Products'].append(product_details.copy())
+                for key in product_details.keys():
+                    product_details[key] = None
 
-                # Mass pickup button
-                if jt:
-                    self.browser.find_element_by_xpath(
-                    '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div[1]/div/div/div/button').click()
-                else:
-                    self.browser.find_element_by_xpath(
-                    '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/button').click()
+            self.orderDetails.append(order_config.copy())
+
+            self.browser.close()
+            self.browser.switch_to.window(self.browser.window_handles[0])
+
+            # Print waybill page
+            # WebDriverWait(self.browser, 10).until(
+            #    EC.element_to_be_clickable(
+            #        (By.CLASS_NAME, 'shopee-checkbox__input')))
+
+            time.sleep(3)
+
+            # Mass pickup button
+            self.browser.find_element_by_xpath('//button[normalize-space()="Mass Arrange Pickup"]').click()
+
+            # Confirm Button
+            WebDriverWait(self.browser, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH,
+                     '//button[normalize-space()="Confirm"]')))
+
+            element = self.browser.find_element_by_xpath('//button[normalize-space()="Confirm"]')
+            self.browser.execute_script("arguments[0].click();", element)
 
 
-                # Confirm Button
-                WebDriverWait(self.browser, 10).until(
-                    EC.presence_of_element_located(
-                        (By.XPATH,
-                         '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/div[4]/button[2]')))
+            # Generate button
+            WebDriverWait(self.browser, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH,
+                     '//button[normalize-space()="Generate"]')))
 
-                self.browser.find_element_by_xpath(
-                    '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/div/div/div/div[4]/button[2]').click()
+            time.sleep(5)
+            generate_button_ele = self.browser.find_element_by_xpath(
+                '//button[normalize-space()="Generate"]')
 
-                # Generate button
-                WebDriverWait(self.browser, 10).until(
-                    EC.presence_of_element_located(
-                        (By.XPATH,
-                         '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[3]/div[2]/div/button')))
+            action = ActionChains(self.browser)
+            action.move_to_element(generate_button_ele).perform()
 
-                # tracking_num = ""
-                # while len(tracking_num.strip()) == 0:
-                #     tracking_num = self.browser.find_element_by_xpath(
-                #         '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[2]/div/div[2]/div[3]').text
-                #
-                # order_config["TrackingId"] = self.browser.find_element_by_xpath(
-                #         '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[2]/div/div[2]/div[3]').text
-                time.sleep(5)
-                generate_button_ele = self.browser.find_element_by_xpath(
-                    '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[3]/div[2]/div/button')
+            time.sleep(2)
 
-                action = ActionChains(self.browser)
-                action.move_to_element(generate_button_ele).perform()
+            generate_waybill_button = self.browser.find_element_by_xpath('/html/body/div[5]/ul/li[2]/div[2]/div')
 
-                time.sleep(2)
+            action.move_to_element(generate_waybill_button).perform()
+            generate_waybill_button.click()
 
-                generate_waybill_button = self.browser.find_element_by_xpath('/html/body/div[5]/ul/li[2]/div[2]/div')
+            time.sleep(3)
 
-                action.move_to_element(generate_waybill_button).perform()
-                generate_waybill_button.click()
+            self.save_pdf(order_id)
 
-                time.sleep(3)
-
-                self.save_pdf(order_id)
-
-                self.browser.switch_to.window(self.browser.window_handles[0])
-                time.sleep(3)
-                self.browser.find_element_by_xpath(
-                    '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[1]/div[2]/div/div/div[1]/div/div[2]/div[1]/div[2]/i').click()
-                time.sleep(5)
-                self.browser.refresh()
-                WebDriverWait(self.browser, 10).until(
-                    EC.presence_of_element_located(
-                        (By.CLASS_NAME, 'mass-ship-list-item')))
-
-            else:
-                print("already have order id: ", order_id)
+            self.browser.switch_to.window(self.browser.window_handles[0])
+            time.sleep(3)
+            self.browser.find_element_by_xpath('//div[normalize-space()="Collapse"]').click()
+            time.sleep(5)
+            self.browser.refresh()
+            WebDriverWait(self.browser, 10).until(
+                EC.presence_of_element_located(
+                    (By.CLASS_NAME, 'mass-ship-list-item')))
 
     def save_pdf(self, order_id):
         # Saving PDF
@@ -261,7 +258,8 @@ class ShopeeAutomation:
         time.sleep(10)
         pyautogui.rightClick(x=self.windows_size['width'] // 2, y=self.windows_size['height'] // 2)
         pyautogui.typewrite(['a'])
-        path = os.getcwd() + '\\waybill_pdf\\{0}.pdf'.format(order_id)
+        path = self.format_path([self.homeDirectory, self.pdfFolder, "{0}.pdf".format(order_id)])
+        # path = os.getcwd() + '\\waybill_pdf\\{0}.pdf'.format()
         pyperclip.copy(path)
         time.sleep(5)
         pyautogui.hotkey('ctrlleft', 'V')
@@ -271,13 +269,17 @@ class ShopeeAutomation:
 
     def standard_delivery(self):
         # Standard delivery
+        time.sleep(20)
         WebDriverWait(self.browser, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH,
-                 '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]')))
+            EC.element_to_be_clickable(
+                (By.CLASS_NAME,
+                 'shopee-radio-button__label')))
 
-        self.browser.find_element_by_xpath(
-            '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]').click()
+        order_filters = self.browser.find_elements_by_class_name('shopee-radio-button__label')
+
+        for order_filter in order_filters:
+            if "standard" in order_filter.text.lower():
+                order_filter.click()
 
         WebDriverWait(self.browser, 10).until(
             EC.presence_of_element_located(
@@ -288,39 +290,142 @@ class ShopeeAutomation:
             print("No orders in Standard delivery.")
         #
         else:
-            with open('standard_order.json', 'w') as outfile:
+            file = self.format_path([self.homeDirectory, self.jsonFolder, "standard_order.json"])
+            with open(file, 'w') as outfile:
                 json.dump(self.orderDetails, outfile)
         # print(self.orderDetails)
 
     def jandt_express_delivery(self):
         # J&T Express delivery
         WebDriverWait(self.browser, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH,
-                 '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[2]')))
+            EC.element_to_be_clickable(
+                (By.CLASS_NAME,
+                 'shopee-radio-button__label')))
 
-        self.browser.find_element_by_xpath(
-            '//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[2]').click()
+        order_filters = self.browser.find_elements_by_class_name('shopee-radio-button__label')
+
+        for order_filter in order_filters:
+            if "j&t" in order_filter.text.lower():
+                order_filter.click()
 
         WebDriverWait(self.browser, 10).until(
             EC.presence_of_element_located(
                 (By.CLASS_NAME, 'mass-ship-list-item')))
 
-        self.get_orders_generate_pdf(jt=1)
+        # print(self.browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]/span').text)
+        self.get_orders_generate_pdf()
         if self.orderDetails == 0:
             print("No orders in J&T Express delivery.")
         else:
-            with open('j&tExpress_order.json', 'w') as outfile:
+            file = self.format_path([self.homeDirectory, self.jsonFolder, "j&tExpress_order.json"])
+            with open(file, 'w') as outfile:
                 json.dump(self.orderDetails, outfile)
         # print(self.orderDetails)
+
+    def format_path(self, pathList):
+        path = ""
+        for x in pathList:
+            path += x
+        return os.path.normpath(path)
 
     def teardown(self):
         """Close browser"""
         self.browser.close()
 
 
+class Pdf:
+    def __init__(self):
+        paths = json.loads(self.read_file("config\\config.json"))[0]
+        self.homeDirectory = paths.get("homeDirectory")
+        self.jsonPattern = paths.get("jsonPattern")
+        self.jsonFolder = paths.get("jsonFolder")
+        self.pdfFolder = paths.get("pdfFolder")
+        self.readPDFPattern = paths.get("readPDFPattern")
+        self.writePDFPattern = paths.get("writePDFPattern")
+        self.cpuPDFFile = paths.get("cpuPDFFile")
+        self.dic = {}
+
+    def read_file(self, filePath):
+        with open(filePath, "r") as file:
+            return file.read()
+
+    def get_file(self, file):
+        return glob.glob(file)
+
+    def format_path(self, pathList):
+        path = ""
+        for x in pathList:
+            path += x
+        return os.path.normpath(path)
+
+    def format_data(self, data):
+        orderID = data.get("OrderId", "")
+        productStr = ""
+        for product in data["Products"]:
+            productStr += "{0:>2} x {1:<30}\\n".format(int(product['Quantity']),
+                                                       product['Variation'].replace("Variation: ", ""))
+        productStr = productStr[:-2]
+        return [orderID, productStr]
+
+    def format_pdf(self, pdfCPU, sourcePDFFile, destinationPDFFile, productDetails):
+        white_box = 'stamp add -mode text -- "Plain" "font:Courier, rot:0.0, pos:bl, off: 3 5,bo:1 #FFFFFF,fillc:#FFFFFF,bgcol:#FFFFFF, sc: 0.43 rel"'
+        cmd = "cmd /c {0} {1} {2}".format(pdfCPU, white_box, sourcePDFFile)
+        os.system(cmd)
+
+        write_box_cmd = 'stamp add -mode text --'
+        # write_box_param = '"font:Courier, rot:0.0, pos:bl, off: 2 5,bo:1 #FFFFFF,fillc:#000000,bgcol:#FFFFFF, sc: 0.435 rel"'
+        write_box_param = '"font:Courier, rot:0.0, pos:bl, off: 4 4,fillc:#000000, sc: 0.435 rel"'
+        cmd = "cmd /c {0} {1} \"{2}\" {3} {4} {5}".format(pdfCPU, write_box_cmd, productDetails, write_box_param,
+                                                          sourcePDFFile, destinationPDFFile)
+        os.system(cmd)
+        os.remove(sourcePDFFile)
+
+    def write(self):
+        if (self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern]))):
+            for file in self.get_file(self.format_path([self.homeDirectory, self.jsonFolder, self.jsonPattern])):
+                fileData = json.loads(self.read_file(file))
+                for data in fileData:
+                    orderID, productStr = self.format_data(data)
+                    self.dic[orderID] = productStr
+
+            for pdfFile in self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern])):
+                pdfName = pdfFile.split("\\")[-1]
+                pdf = pdfName.split(".")[0]
+                productDetails = self.dic.get(pdf, "")
+                if productDetails:
+                    cpuPDFPath = self.format_path([self.homeDirectory, self.cpuPDFFile])
+                    destinationPDFFile = self.format_path([self.homeDirectory, self.writePDFPattern, pdfName])
+                    self.format_pdf(cpuPDFPath, pdfFile, destinationPDFFile, productDetails)
+
+
+class Setup:
+    def __init__(self):
+        paths = ""
+        with open("config\\config.json", "r") as file:
+            paths = json.loads(file.read())[0]
+        self.homeDirectory = paths.get("homeDirectory")
+        self.jsonFolder = paths.get("jsonFolder")
+        self.writePDFPattern = paths.get("writePDFPattern")
+        self.pdfFolder = paths.get("pdfFolder")
+
+    def checkDir(self, file):
+        if not os.path.isdir(os.path.normpath(self.homeDirectory + file)):
+            os.mkdir(file.replace("/", ""))
+
+    def run(self):
+        self.checkDir(self.jsonFolder)
+        self.checkDir(self.writePDFPattern)
+        self.checkDir(self.pdfFolder)
+
+
 if __name__ == "__main__":
+    s = Setup()
+    s.run()
+
     shopeeAutomate = ShopeeAutomation()
     shopeeAutomate.setup()
     shopeeAutomate.run()
     shopeeAutomate.teardown()
+
+    pdf = Pdf()
+    pdf.write()
