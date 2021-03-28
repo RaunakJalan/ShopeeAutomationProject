@@ -1,0 +1,14 @@
+[
+	{
+		"url"				: "https://seller.shopee.ph/account/signin?next=%2F",
+		"username"			: "gardenlabphilippines:staff1",
+		"password"			: "IOU123shopee",
+		"homeDirectory" 	: "D:/git/ShopeeAutomationProject",
+		"jsonFolder"		: "/json_data/",
+		"pdfFolder"			: "/waybill_pdf/",
+		"jsonPattern" 		: "*.json",
+		"readPDFPattern" 	: "*.pdf",
+		"writePDFPattern"	: "/updated_pdf/",
+		"cpuPDFFile" 		: "/pdfcpu/pdfcpu.exe"
+	}
+]
