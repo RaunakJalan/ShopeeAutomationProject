@@ -108,7 +108,7 @@ class ShopeeAutomation:
             EC.element_to_be_clickable(
                 (By.LINK_TEXT, 'Mass Ship')))
 
-        self.browser.find_element_by_link_text('Mass Shipsadwq').click()
+        self.browser.find_element_by_link_text('Mass Ship').click()
 
         # Orders to ship
         WebDriverWait(self.browser, 10).until(
@@ -194,11 +194,6 @@ class ShopeeAutomation:
             self.browser.close()
             self.browser.switch_to.window(self.browser.window_handles[0])
 
-            # Print waybill page
-            # WebDriverWait(self.browser, 10).until(
-            #    EC.element_to_be_clickable(
-            #        (By.CLASS_NAME, 'shopee-checkbox__input')))
-
             time.sleep(3)
 
             # Mass pickup button
@@ -210,6 +205,7 @@ class ShopeeAutomation:
                     (By.XPATH,
                      '//button[normalize-space()="Confirm"]')))
 
+            time.sleep(2)
             element = self.browser.find_element_by_xpath('//button[normalize-space()="Confirm"]')
             self.browser.execute_script("arguments[0].click();", element)
 
@@ -375,6 +371,18 @@ class Pdf:
         os.system(cmd)
         os.remove(sourcePDFFile)
 
+    def merge_pdf(self,cpuPDFPath):
+        file = self.format_path([self.homeDirectory, self.writePDFPattern, "merge.pdf"])
+        all_pdf = self.get_file(self.format_path([self.homeDirectory, self.writePDFPattern, self.readPDFPattern]))
+        pdf_str = ""
+        for pdf in all_pdf:
+            pdf_str = pdf_str + pdf + " "
+        cmd = "cmd /c {0} merge {1} {2}".format(cpuPDFPath, file, pdf_str)
+        os.system(cmd)
+
+        for pdf in all_pdf:
+            os.remove(pdf)
+
     def write(self):
         if (self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern]))):
             for file in self.get_file(self.format_path([self.homeDirectory, self.jsonFolder, self.jsonPattern])):
@@ -383,15 +391,16 @@ class Pdf:
                     orderID, productStr = self.format_data(data)
                     self.dic[orderID] = productStr
 
+            cpuPDFPath = self.format_path([self.homeDirectory, self.cpuPDFFile])
             for pdfFile in self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern])):
                 pdfName = pdfFile.split("\\")[-1]
                 pdf = pdfName.split(".")[0]
                 productDetails = self.dic.get(pdf, "")
                 if productDetails:
-                    cpuPDFPath = self.format_path([self.homeDirectory, self.cpuPDFFile])
                     destinationPDFFile = self.format_path([self.homeDirectory, self.writePDFPattern, pdfName])
                     self.format_pdf(cpuPDFPath, pdfFile, destinationPDFFile, productDetails)
 
+            self.merge_pdf(cpuPDFPath)
 
 class Setup:
     def __init__(self):
