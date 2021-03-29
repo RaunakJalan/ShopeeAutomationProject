@@ -134,10 +134,8 @@ class ShopeeAutomation:
         time.sleep(3)
         flag = 0
         orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
-        if len(orders)>3:
-            orders = orders[1:3]
-        else:
-            orders = orders[1:]
+
+        orders = orders[1:]
 
         number_of_orders = len(orders)
         if number_of_orders == 0:
@@ -154,10 +152,7 @@ class ShopeeAutomation:
 
             orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
             orders = orders[1:]
-            if flag:
-                order = orders[1]
-            else:
-                order = orders[0]
+            order = orders[flag]
             number_of_orders -= 1
             order.find_element_by_class_name("shopee-checkbox__indicator").click()
 
@@ -167,7 +162,7 @@ class ShopeeAutomation:
             if not order.find_element_by_class_name("shopee-checkbox__input").is_selected():
 
                 print("Cannot generate PDF for order id {}. Skipping it".format(order_id))
-                number_of_orders=0
+                flag += 1
                 continue
 
             order_ids.append(order_id)
