@@ -15,7 +15,7 @@ import glob
 class ShopeeAutomation:
     def __init__(self):
         self.browser = ""
-        self.orderDetails = ""
+        self.orderDetails = []
         self.cookies = ""
         self.windows_size = 0
 
@@ -121,34 +121,41 @@ class ShopeeAutomation:
 
         time.sleep(5)
 
-        self.standard_delivery()
+        WebDriverWait(self.browser, 10).until(
+            EC.element_to_be_clickable(
+                (By.CLASS_NAME,
+                 'shopee-radio-button__label')))
 
-        self.browser.refresh()
-        time.sleep(3)
-
-        self.jandt_express_delivery()
+        delivery_types = self.browser.find_elements_by_class_name('shopee-radio-button__label')
+        num_types = 0
+        while num_types < len(delivery_types):
+            if "other" in delivery_types[num_types].text.lower():
+                num_types += 1
+                continue
+            delivery_types[num_types].click()
+            self.delivery(delivery_types[num_types].text)
+            time.sleep(3)
+            num_types += 1
+            delivery_types = self.browser.find_elements_by_class_name('shopee-radio-button__label')
 
         time.sleep(10)
 
     def get_orders_generate_pdf(self):
-        time.sleep(3)
+
         flag = 0
+        time.sleep(5)
         orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
-
-        orders = orders[1:]
-
         number_of_orders = len(orders)
-        if number_of_orders == 0:
+        if number_of_orders == 1:
             return 0
 
+        orders = orders[1:]
+        number_of_orders = len(orders)
         order_ids = []
-
-        self.orderDetails = []
         order_config = {"OrderId": None, "TrackingId": None, "Products": None}
         product_details = {"Name": None, "Quantity": None, "Variation": None, "UnitPrice": None, "SubTotal": None}
 
         while number_of_orders > 0:
-            time.sleep(3)
 
             orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
             orders = orders[1:]
@@ -194,6 +201,11 @@ class ShopeeAutomation:
             self.browser.close()
             self.browser.switch_to.window(self.browser.window_handles[0])
 
+            # Print waybill page
+            # WebDriverWait(self.browser, 10).until(
+            #    EC.element_to_be_clickable(
+            #        (By.CLASS_NAME, 'shopee-checkbox__input')))
+
             time.sleep(3)
 
             # Mass pickup button
@@ -205,7 +217,6 @@ class ShopeeAutomation:
                     (By.XPATH,
                      '//button[normalize-space()="Confirm"]')))
 
-            time.sleep(2)
             element = self.browser.find_element_by_xpath('//button[normalize-space()="Confirm"]')
             self.browser.execute_script("arguments[0].click();", element)
 
@@ -237,11 +248,13 @@ class ShopeeAutomation:
             self.browser.switch_to.window(self.browser.window_handles[0])
             time.sleep(3)
             self.browser.find_element_by_xpath('//div[normalize-space()="Collapse"]').click()
+
             time.sleep(5)
             self.browser.refresh()
             WebDriverWait(self.browser, 10).until(
                 EC.presence_of_element_located(
                     (By.CLASS_NAME, 'mass-ship-list-item')))
+        return 1
 
     def save_pdf(self, order_id):
         # Saving PDF
@@ -258,59 +271,30 @@ class ShopeeAutomation:
 
         self.browser.close()
 
-    def standard_delivery(self):
-        # Standard delivery
-        time.sleep(20)
-        WebDriverWait(self.browser, 10).until(
-            EC.element_to_be_clickable(
-                (By.CLASS_NAME,
-                 'shopee-radio-button__label')))
+    def delivery(self, type_delivery):
+        file = self.format_path([self.homeDirectory, self.jsonFolder, "order_details.json"])
+        try:
+            WebDriverWait(self.browser, 10).until(
+                EC.presence_of_element_located(
+                    (By.CLASS_NAME, 'mass-ship-list-item')))
 
-        order_filters = self.browser.find_elements_by_class_name('shopee-radio-button__label')
+            ret = self.get_orders_generate_pdf()
 
-        for order_filter in order_filters:
-            if "standard" in order_filter.text.lower():
-                order_filter.click()
-
-        WebDriverWait(self.browser, 10).until(
-            EC.presence_of_element_located(
-                (By.CLASS_NAME, 'mass-ship-list-item')))
-
-        self.get_orders_generate_pdf()
-        if len(self.orderDetails) == 0:
-            print("No orders in Standard delivery.")
-        #
-        else:
-            file = self.format_path([self.homeDirectory, self.jsonFolder, "standard_order.json"])
+            if ret == 0:
+                del_string = type_delivery.strip().split(' ')
+                i = 0
+                final_str = ""
+                while i < len(del_string) and del_string[i] != '(':
+                    final_str += del_string[i] + " "
+                    i += 1
+                print("No orders in {0}.".format(final_str))
+            else:
+                with open(file, 'w') as outfile:
+                    json.dump(self.orderDetails, outfile)
+        finally:
             with open(file, 'w') as outfile:
                 json.dump(self.orderDetails, outfile)
-        # print(self.orderDetails)
 
-    def jandt_express_delivery(self):
-        # J&T Express delivery
-        WebDriverWait(self.browser, 10).until(
-            EC.element_to_be_clickable(
-                (By.CLASS_NAME,
-                 'shopee-radio-button__label')))
-
-        order_filters = self.browser.find_elements_by_class_name('shopee-radio-button__label')
-
-        for order_filter in order_filters:
-            if "j&t" in order_filter.text.lower():
-                order_filter.click()
-
-        WebDriverWait(self.browser, 10).until(
-            EC.presence_of_element_located(
-                (By.CLASS_NAME, 'mass-ship-list-item')))
-
-        # print(self.browser.find_element_by_xpath('//*[@id="app"]/div[2]/div[2]/div/div/div/div/div/div/div[2]/div[1]/div/div[2]/div[1]/div/div[1]/label[1]/span').text)
-        self.get_orders_generate_pdf()
-        if self.orderDetails == 0:
-            print("No orders in J&T Express delivery.")
-        else:
-            file = self.format_path([self.homeDirectory, self.jsonFolder, "j&tExpress_order.json"])
-            with open(file, 'w') as outfile:
-                json.dump(self.orderDetails, outfile)
         # print(self.orderDetails)
 
     def format_path(self, pathList):
