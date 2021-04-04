@@ -3,7 +3,7 @@
 		"url"				: "https://seller.shopee.ph/account/signin?next=%2F",
 		"username"			: "gardenlabphilippines:staff1",
 		"password"			: "IOU123shopee",
-		"homeDirectory" 	: "D:/git/ShopeeAutomationProject",
+		"homeDirectory" 	: "C:/Users/rjalan/Documents/ShopeeAutomationProject",
 		"jsonFolder"		: "/json_data/",
 		"pdfFolder"			: "/waybill_pdf/",
 		"jsonPattern" 		: "*.json",

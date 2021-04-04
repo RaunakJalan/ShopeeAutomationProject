@@ -10,6 +10,8 @@ import os
 import json
 import pyperclip, pyautogui
 import glob
+import traceback
+from datetime import datetime
 
 
 class ShopeeAutomation:
@@ -129,12 +131,13 @@ class ShopeeAutomation:
         delivery_types = self.browser.find_elements_by_class_name('shopee-radio-button__label')
         num_types = 0
         while num_types < len(delivery_types):
+            print(delivery_types[num_types].text.lower())
             if "other" in delivery_types[num_types].text.lower():
                 num_types += 1
                 continue
             delivery_types[num_types].click()
             self.delivery(delivery_types[num_types].text)
-            time.sleep(3)
+            time.sleep(5)
             num_types += 1
             delivery_types = self.browser.find_elements_by_class_name('shopee-radio-button__label')
 
@@ -142,7 +145,7 @@ class ShopeeAutomation:
 
     def get_orders_generate_pdf(self):
 
-        flag = 0
+        flag = 1
         time.sleep(5)
         orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
         number_of_orders = len(orders)
@@ -150,28 +153,27 @@ class ShopeeAutomation:
             return 0
 
         orders = orders[1:]
-        number_of_orders = len(orders)
+        # number_of_orders = len(orders)
+        number_of_orders = 2 if len(orders) > 2 else 1
         order_ids = []
-        order_config = {"OrderId": None, "TrackingId": None, "Products": None}
+        order_config = {"OrderId": None, "Products": None}
         product_details = {"Name": None, "Quantity": None, "Variation": None, "UnitPrice": None, "SubTotal": None}
 
         while number_of_orders > 0:
-
+            time.sleep(5)
             orders = self.browser.find_elements_by_class_name("mass-ship-list-item")
-            orders = orders[1:]
             order = orders[flag]
-            number_of_orders -= 1
             order.find_element_by_class_name("shopee-checkbox__indicator").click()
 
             order_id_ele = order.find_element_by_class_name('orderid')
             order_id = order_id_ele.text
-
-            if not order.find_element_by_class_name("shopee-checkbox__input").is_selected():
-
-                print("Cannot generate PDF for order id {}. Skipping it".format(order_id))
+            time.sleep(3)
+            if not order.find_element_by_class_name("shopee-checkbox__input").is_selected() and flag < number_of_orders:
                 flag += 1
-                continue
+                print("Cannot generate PDF for order id {}. Skipping it".format(order_id))
 
+            number_of_orders = number_of_orders - 1
+            # number_of_orders = len(orders) - 1 - flag
             order_ids.append(order_id)
             order_config["OrderId"] = order_id
             order_config["Products"] = list()
@@ -201,11 +203,6 @@ class ShopeeAutomation:
             self.browser.close()
             self.browser.switch_to.window(self.browser.window_handles[0])
 
-            # Print waybill page
-            # WebDriverWait(self.browser, 10).until(
-            #    EC.element_to_be_clickable(
-            #        (By.CLASS_NAME, 'shopee-checkbox__input')))
-
             time.sleep(3)
 
             # Mass pickup button
@@ -218,8 +215,9 @@ class ShopeeAutomation:
                      '//button[normalize-space()="Confirm"]')))
 
             element = self.browser.find_element_by_xpath('//button[normalize-space()="Confirm"]')
+            action = ActionChains(self.browser)
+            action.move_to_element(element).perform()
             self.browser.execute_script("arguments[0].click();", element)
-
 
             # Generate button
             WebDriverWait(self.browser, 10).until(
@@ -230,11 +228,10 @@ class ShopeeAutomation:
             time.sleep(5)
             generate_button_ele = self.browser.find_element_by_xpath(
                 '//button[normalize-space()="Generate"]')
-
             action = ActionChains(self.browser)
             action.move_to_element(generate_button_ele).perform()
 
-            time.sleep(2)
+            time.sleep(3)
 
             generate_waybill_button = self.browser.find_element_by_xpath('/html/body/div[5]/ul/li[2]/div[2]/div')
 
@@ -244,6 +241,7 @@ class ShopeeAutomation:
             time.sleep(3)
 
             self.save_pdf(order_id)
+            print("Downloaded pdf for order id: {}".format(order_id))
 
             self.browser.switch_to.window(self.browser.window_handles[0])
             time.sleep(3)
@@ -272,30 +270,25 @@ class ShopeeAutomation:
         self.browser.close()
 
     def delivery(self, type_delivery):
-        file = self.format_path([self.homeDirectory, self.jsonFolder, "order_details.json"])
-        try:
-            WebDriverWait(self.browser, 10).until(
-                EC.presence_of_element_located(
-                    (By.CLASS_NAME, 'mass-ship-list-item')))
+        WebDriverWait(self.browser, 10).until(
+            EC.presence_of_element_located(
+                (By.CLASS_NAME, 'mass-ship-list-item')))
 
-            ret = self.get_orders_generate_pdf()
+        ret = self.get_orders_generate_pdf()
 
-            if ret == 0:
-                del_string = type_delivery.strip().split(' ')
-                i = 0
-                final_str = ""
-                while i < len(del_string) and del_string[i] != '(':
-                    final_str += del_string[i] + " "
-                    i += 1
-                print("No orders in {0}.".format(final_str))
-            else:
-                with open(file, 'w') as outfile:
-                    json.dump(self.orderDetails, outfile)
-        finally:
-            with open(file, 'w') as outfile:
-                json.dump(self.orderDetails, outfile)
-
+        if ret == 0:
+            del_string = type_delivery.strip().split(' ')
+            i = 0
+            final_str = ""
+            while i < len(del_string) and del_string[i] != '(':
+                final_str += del_string[i] + " "
+                i += 1
+            print("No orders in {0}.".format(final_str))
         # print(self.orderDetails)
+
+    @property
+    def get_order_details(self):
+        return self.orderDetails
 
     def format_path(self, pathList):
         path = ""
@@ -305,7 +298,11 @@ class ShopeeAutomation:
 
     def teardown(self):
         """Close browser"""
-        self.browser.close()
+        try:
+            if self.browser is not None:
+                self.browser.quit()
+        except Exception:
+            traceback.print_exc()
 
 
 class Pdf:
@@ -337,31 +334,28 @@ class Pdf:
         orderID = data.get("OrderId", "")
         productStr = ""
         for product in data["Products"]:
-            productStr += "{0:>2} x {1:<30}\\n".format(int(product['Quantity']),
+            productStr += "{0:>2} x {1:<23}\\n".format(int(product['Quantity']),
                                                        product['Variation'].replace("Variation: ", ""))
         productStr = productStr[:-2]
         return [orderID, productStr]
 
-    def format_pdf(self, pdfCPU, sourcePDFFile, destinationPDFFile, productDetails):
-        white_box = 'stamp add -mode text -- "Plain" "font:Courier, rot:0.0, pos:bl, off: 3 5,bo:1 #FFFFFF,fillc:#FFFFFF,bgcol:#FFFFFF, sc: 0.43 rel"'
+    def format_pdf(self, pdfCPU, sourcePDFFile, productDetails):
+        white_box = 'stamp add -mode text -- "Plain" "font:Courier, rot:0.0, pos:bl, off: 3 5,bo:1 #FFFFFF,fillc:#FFFFFF,bgcol:#FFFFFF, sc: 0.435 rel"'
         cmd = "cmd /c {0} {1} {2}".format(pdfCPU, white_box, sourcePDFFile)
         os.system(cmd)
 
         write_box_cmd = 'stamp add -mode text --'
         # write_box_param = '"font:Courier, rot:0.0, pos:bl, off: 2 5,bo:1 #FFFFFF,fillc:#000000,bgcol:#FFFFFF, sc: 0.435 rel"'
-        write_box_param = '"font:Courier, rot:0.0, pos:bl, off: 4 4,fillc:#000000, sc: 0.435 rel"'
-        cmd = "cmd /c {0} {1} \"{2}\" {3} {4} {5}".format(pdfCPU, write_box_cmd, productDetails, write_box_param,
-                                                          sourcePDFFile, destinationPDFFile)
+        write_box_param = '"font:Courier-Bold, rot:0.0, pos:bl, off: 4 4,fillc:#000000, sc: 0.44 rel"'
+        cmd = "cmd /c {0} {1} \"{2}\" {3} {4}".format(pdfCPU, write_box_cmd, productDetails, write_box_param, sourcePDFFile)
         os.system(cmd)
-        os.remove(sourcePDFFile)
 
-    def merge_pdf(self,cpuPDFPath):
-        file = self.format_path([self.homeDirectory, self.writePDFPattern, "merge.pdf"])
-        all_pdf = self.get_file(self.format_path([self.homeDirectory, self.writePDFPattern, self.readPDFPattern]))
+    def merger_pdf(self, cpuPDFPath, destinationPDFFile):
+        all_pdf = self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern]))
         pdf_str = ""
         for pdf in all_pdf:
             pdf_str = pdf_str + pdf + " "
-        cmd = "cmd /c {0} merge {1} {2}".format(cpuPDFPath, file, pdf_str)
+        cmd = "cmd /c {0} merge {1} {2}".format(cpuPDFPath, destinationPDFFile, pdf_str)
         os.system(cmd)
 
         for pdf in all_pdf:
@@ -376,15 +370,19 @@ class Pdf:
                     self.dic[orderID] = productStr
 
             cpuPDFPath = self.format_path([self.homeDirectory, self.cpuPDFFile])
-            for pdfFile in self.get_file(self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern])):
+            for pdfFile in self.get_file(
+                    self.format_path([self.homeDirectory, self.pdfFolder, self.readPDFPattern])):
                 pdfName = pdfFile.split("\\")[-1]
                 pdf = pdfName.split(".")[0]
                 productDetails = self.dic.get(pdf, "")
                 if productDetails:
-                    destinationPDFFile = self.format_path([self.homeDirectory, self.writePDFPattern, pdfName])
-                    self.format_pdf(cpuPDFPath, pdfFile, destinationPDFFile, productDetails)
+                    self.format_pdf(cpuPDFPath, pdfFile, productDetails)
 
-            self.merge_pdf(cpuPDFPath)
+            now = datetime.now()
+            dt_string = "{0}{1}{2}".format("merge(", now.strftime("%d-%B-%Y_%H.%M.%S"), ").pdf")
+            destinationPDFFile = self.format_path([self.homeDirectory, self.writePDFPattern, dt_string])
+            self.merger_pdf(cpuPDFPath, destinationPDFFile)
+
 
 class Setup:
     def __init__(self):
@@ -411,9 +409,17 @@ if __name__ == "__main__":
     s.run()
 
     shopeeAutomate = ShopeeAutomation()
-    shopeeAutomate.setup()
-    shopeeAutomate.run()
-    shopeeAutomate.teardown()
-
     pdf = Pdf()
-    pdf.write()
+    shopeeAutomate.setup()
+    file = ""
+    try:
+        file = pdf.format_path([s.homeDirectory, s.jsonFolder, "order_details.json"])
+        shopeeAutomate.run()
+        shopeeAutomate.teardown()
+    except Exception:
+        traceback.print_exc()
+    finally:
+        with open(file, 'w') as outfile:
+            json.dump(shopeeAutomate.get_order_details, outfile)
+            shopeeAutomate.teardown()
+        pdf.write()
